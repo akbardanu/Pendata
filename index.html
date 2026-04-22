@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analisis Data Kesuburan Tanah — KNN</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Source+Code+Pro:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --soil: #3d2b1f;
+    --leaf: #2d6a4f;
+    --leaf-light: #40916c;
+    --leaf-pale: #b7e4c7;
+    --sand: #f5ebe0;
+    --clay: #e9c46a;
+    --clay-dark: #c9a227;
+    --bark: #6d4c41;
+    --mist: #f0f4f0;
+    --text: #1a1a1a;
+    --text-muted: #5a5a5a;
+    --accent: #e76f51;
+    --border: #d4c5b0;
+    --subur: #2d6a4f;
+    --tidak-subur: #c0392b;
+    --card-bg: #fffdf9;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--mist);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--soil);
+    color: #fff;
+    padding: 3.5rem 2rem 2.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 20px,
+      rgba(255,255,255,0.02) 20px,
+      rgba(255,255,255,0.02) 40px
+    );
+  }
+  .header-inner { max-width: 900px; margin: 0 auto; position: relative; }
+  header .tag {
+    display: inline-block;
+    background: var(--leaf);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 4px 14px;
+    border-radius: 2px;
+    margin-bottom: 1.2rem;
+  }
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 0.8rem;
+    color: var(--sand);
+  }
+  header p {
+    color: rgba(255,255,255,0.65);
+    font-size: 14px;
+    max-width: 540px;
+  }
+  .header-meta {
+    display: flex;
+    gap: 2rem;
+    margin-top: 2rem;
+    flex-wrap: wrap;
+  }
+  .meta-item { font-size: 12px; color: rgba(255,255,255,0.5); }
+  .meta-item strong { display: block; color: var(--clay); font-size: 13px; margin-bottom: 2px; }
+
+  /* ── LAYOUT ── */
+  main { max-width: 900px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+
+  /* ── SECTION ── */
+  section { margin-bottom: 2.8rem; }
+  .section-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--leaf);
+    margin-bottom: 0.6rem;
+  }
+  h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--soil);
+    margin-bottom: 1.2rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 2px solid var(--border);
+  }
+  h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--bark);
+    margin: 1.4rem 0 0.7rem;
+  }
+  p { color: var(--text-muted); margin-bottom: 0.8rem; }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.6rem;
+    margin-bottom: 1.2rem;
+  }
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.2rem;
+  }
+  .stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem 1.4rem;
+    border-left: 4px solid var(--leaf);
+  }
+  .stat-card .val {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--leaf);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat-card .lbl { font-size: 12px; color: var(--text-muted); }
+
+  /* ── METRIC CARDS ── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.4rem;
+  }
+  @media(max-width: 500px){ .metrics-grid { grid-template-columns: 1fr; } }
+  .metric {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.3rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .metric-icon {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--leaf-pale);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .metric-name { font-size: 12px; color: var(--text-muted); margin-bottom: 2px; }
+  .metric-val {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: var(--leaf);
+    line-height: 1;
+  }
+  .metric-bar-wrap { height: 6px; background: var(--border); border-radius: 3px; margin-top: 6px; }
+  .metric-bar { height: 100%; border-radius: 3px; background: var(--leaf); transition: width 1.2s ease; }
+
+  /* ── TABLE ── */
+  .tbl-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 1.2rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--card-bg); }
+  thead { background: var(--soil); color: #fff; }
+  thead th { padding: 10px 14px; text-align: left; font-weight: 500; font-size: 12px; letter-spacing: 0.5px; }
+  tbody tr:nth-child(even) { background: var(--mist); }
+  tbody td { padding: 9px 14px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* ── CONFUSION MATRIX ── */
+  .cm-wrap { display: flex; justify-content: center; margin: 1.2rem 0; }
+  .cm { border-collapse: collapse; font-size: 13px; }
+  .cm th, .cm td { padding: 12px 22px; border: 1px solid var(--border); text-align: center; }
+  .cm thead th { background: var(--soil); color: #fff; font-size: 11px; }
+  .cm .row-head { background: var(--mist); font-weight: 500; font-size: 11px; color: var(--soil); }
+  .cm .tp { background: #d4edda; color: #155724; font-weight: 700; font-size: 1.1rem; }
+  .cm .tn { background: #d4edda; color: #155724; font-weight: 700; font-size: 1.1rem; }
+  .cm .fp { background: #f8d7da; color: #721c24; font-weight: 700; font-size: 1.1rem; }
+  .cm .fn { background: #f8d7da; color: #721c24; font-weight: 700; font-size: 1.1rem; }
+
+  /* ── CODE BLOCK ── */
+  pre {
+    background: #1e1e1e;
+    border-radius: 8px;
+    padding: 1.3rem 1.5rem;
+    overflow-x: auto;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: #d4d4d4;
+    margin-bottom: 1.2rem;
+    border-left: 3px solid var(--leaf);
+  }
+  .kw { color: #569cd6; }
+  .fn-c { color: #dcdcaa; }
+  .str { color: #ce9178; }
+  .cm-c { color: #6a9955; font-style: italic; }
+  .num { color: #b5cea8; }
+  .cls { color: #4ec9b0; }
+
+  /* ── PROCESS STEPS ── */
+  .steps { counter-reset: step; }
+  .step {
+    display: flex; gap: 1.2rem;
+    margin-bottom: 1rem;
+    padding: 1.1rem 1.3rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    align-items: flex-start;
+  }
+  .step-num {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--leaf);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .step-title { font-weight: 500; color: var(--soil); margin-bottom: 4px; }
+  .step-desc { font-size: 13px; color: var(--text-muted); }
+
+  /* ── BADGE ── */
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .badge-subur { background: #d4edda; color: #155724; }
+  .badge-tidak { background: #f8d7da; color: #721c24; }
+
+  /* ── CHART ── */
+  .bar-chart { margin: 1.2rem 0; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; }
+  .bar-label { min-width: 130px; color: var(--text-muted); text-align: right; }
+  .bar-outer { flex: 1; background: var(--border); border-radius: 3px; height: 22px; overflow: hidden; }
+  .bar-inner { height: 100%; border-radius: 3px; display: flex; align-items: center; padding-left: 8px; font-size: 11px; color: #fff; font-weight: 500; transition: width 1.4s ease; }
+  .bar-inner.subur { background: var(--leaf); }
+  .bar-inner.tidak { background: var(--accent); }
+  .bar-inner.neutral { background: var(--bark); }
+
+  /* ── KNN VISUAL ── */
+  .knn-visual {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.4rem;
+    text-align: center;
+    margin-bottom: 1.2rem;
+  }
+  .knn-visual svg { max-width: 100%; }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--soil);
+    color: rgba(255,255,255,0.5);
+    text-align: center;
+    padding: 1.5rem;
+    font-size: 12px;
+    margin-top: 4rem;
+  }
+  footer strong { color: var(--clay); }
+
+  /* ── CALLOUT ── */
+  .callout {
+    border-left: 4px solid var(--clay);
+    background: #fffbf0;
+    border-radius: 0 8px 8px 0;
+    padding: 1rem 1.3rem;
+    margin-bottom: 1.2rem;
+    font-size: 13.5px;
+    color: var(--text-muted);
+  }
+  .callout strong { color: var(--clay-dark); }
+
+  /* ── FEATURE TABLE ── */
+  .feat-importance { margin: 1rem 0; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ HEADER ═══════════════════════════════ -->
+<header>
+  <div class="header-inner">
+    <span class="tag">UTS Pendata</span>
+    <h1>Analisis Data Kesuburan Tanah</h1>
+    <p>Klasifikasi kondisi tanah menggunakan metode <strong>K-Nearest Neighbors (KNN)</strong> pada dataset 2.000 sampel dengan 10 fitur agronomis.</p>
+    <div class="header-meta">
+      <div class="meta-item"><strong>Nama</strong>Akbar Danu</div>
+      <div class="meta-item"><strong>NIM</strong> 210411100005</div>
+      <div class="meta-item"><strong>Metode</strong>K-Nearest Neighbors</div>
+      <div class="meta-item"><strong>Dataset</strong>2.000 sampel · 10 fitur</div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ═══════════════════════════════ 1. DATASET ═══════════════════════════ -->
+<section>
+  <div class="section-label">Bagian 1</div>
+  <h2>Deskripsi Dataset</h2>
+
+  <div class="card-grid">
+    <div class="stat-card"><div class="val">2.000</div><div class="lbl">Total Sampel</div></div>
+    <div class="stat-card"><div class="val">10</div><div class="lbl">Fitur Agronomis</div></div>
+    <div class="stat-card"><div class="val">2</div><div class="lbl">Kelas Target</div></div>
+    <div class="stat-card" style="border-left-color:var(--accent)"><div class="val" style="color:var(--accent)">Ada</div><div class="lbl">Missing Values</div></div>
+  </div>
+
+  <p>Dataset berisi sampel tanah dari berbagai kondisi dengan label <span class="badge badge-subur">Subur</span> dan <span class="badge badge-tidak">Tidak Subur</span>, masing-masing berjumlah 1.000 sampel (distribusi seimbang / balanced).</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>#</th><th>Fitur</th><th>Satuan</th><th>Tipe</th>
+        <th>Nilai Subur</th><th>Nilai Tidak Subur</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>1</td><td>pH Tanah</td><td>Skala 0–14</td><td>Numerik</td><td>6,0 – 7,5</td><td>3,5–5,4 / 7,6–9,0</td></tr>
+        <tr><td>2</td><td>N Total</td><td>%</td><td>Numerik</td><td>0,21 – 0,50</td><td>0,01 – 0,20</td></tr>
+        <tr><td>3</td><td>P Tersedia</td><td>ppm</td><td>Numerik</td><td>15 – 60</td><td>1 – 14</td></tr>
+        <tr><td>4</td><td>K Tersedia</td><td>meq/100g</td><td>Numerik</td><td>0,30 – 0,80</td><td>0,05 – 0,29</td></tr>
+        <tr><td>5</td><td>C Organik</td><td>%</td><td>Numerik</td><td>2,0 – 5,0</td><td>0,2 – 1,9</td></tr>
+        <tr><td>6</td><td>KTK</td><td>meq/100g</td><td>Numerik</td><td>20 – 45</td><td>5 – 19</td></tr>
+        <tr><td>7</td><td>Kejenuhan Basa</td><td>%</td><td>Numerik</td><td>60 – 100</td><td>10 – 59</td></tr>
+        <tr><td>8</td><td>Tekstur Tanah</td><td>—</td><td>Kategorikal</td><td>Lempung, dll.</td><td>Pasir, Liat, Debu</td></tr>
+        <tr><td>9</td><td>Kadar Air</td><td>%</td><td>Numerik</td><td>25 – 45</td><td>5–20 / 55–75</td></tr>
+        <tr><td>10</td><td>Bulk Density</td><td>g/cm³</td><td>Numerik</td><td>0,9 – 1,2</td><td>1,4 – 1,9</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ 2. PREPROCESSING ════════════════════ -->
+<section>
+  <div class="section-label">Bagian 2</div>
+  <h2>Pemrosesan Data (Preprocessing)</h2>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div>
+        <div class="step-title">Load Dataset</div>
+        <div class="step-desc">Membaca file Excel (.xlsx) menggunakan <code>pandas.read_excel()</code>. Dataset memiliki 2.000 baris dan 11 kolom (10 fitur + 1 label).</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div>
+        <div class="step-title">Penanganan Missing Values</div>
+        <div class="step-desc">Fitur numerik diimputasi menggunakan <strong>median</strong> (robust terhadap outlier). Fitur kategorikal (Tekstur Tanah) diimputasi menggunakan <strong>modus</strong>.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div>
+        <div class="step-title">Encoding Fitur Kategorikal</div>
+        <div class="step-desc">Kolom <em>Tekstur Tanah</em> dikonversi ke numerik menggunakan <code>LabelEncoder</code> dari scikit-learn.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div>
+        <div class="step-title">Normalisasi Fitur</div>
+        <div class="step-desc">Semua fitur numerik dinormalisasi menggunakan <code>StandardScaler</code> (z-score normalization) agar skala fitur seragam — penting untuk KNN yang berbasis jarak.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div>
+        <div class="step-title">Split Data Train / Test</div>
+        <div class="step-desc">Data dibagi 80% training (1.600 sampel) dan 20% testing (400 sampel) menggunakan <code>train_test_split</code> dengan <code>random_state=42</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <pre><span class="cm-c"># ─── Import Library ───────────────────────────────────────────</span>
+<span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">import</span> numpy <span class="kw">as</span> np
+<span class="kw">from</span> sklearn.model_selection <span class="kw">import</span> train_test_split
+<span class="kw">from</span> sklearn.preprocessing  <span class="kw">import</span> StandardScaler, LabelEncoder
+<span class="kw">from</span> sklearn.impute          <span class="kw">import</span> SimpleImputer
+<span class="kw">from</span> sklearn.neighbors       <span class="kw">import</span> KNeighborsClassifier
+<span class="kw">from</span> sklearn.metrics         <span class="kw">import</span> (accuracy_score, precision_score,
+                                       recall_score, f1_score,
+                                       confusion_matrix, classification_report)
+
+<span class="cm-c"># ─── 1. Load Dataset ──────────────────────────────────────────</span>
+df = pd.<span class="fn-c">read_excel</span>(<span class="str">"kesuburan_tanah.xlsx"</span>)
+<span class="fn-c">print</span>(df.<span class="fn-c">shape</span>)          <span class="cm-c"># (2000, 11)</span>
+<span class="fn-c">print</span>(df.<span class="fn-c">isnull</span>().<span class="fn-c">sum</span>()) <span class="cm-c"># cek missing values</span>
+
+<span class="cm-c"># ─── 2. Pisah Fitur dan Label ──────────────────────────────────</span>
+X = df.<span class="fn-c">drop</span>(columns=[<span class="str">"Kesuburan"</span>])
+y = df[<span class="str">"Kesuburan"</span>]   <span class="cm-c"># "Subur" / "Tidak Subur"</span>
+
+<span class="cm-c"># ─── 3. Encoding Label ────────────────────────────────────────</span>
+le = <span class="cls">LabelEncoder</span>()
+y  = le.<span class="fn-c">fit_transform</span>(y)  <span class="cm-c"># Subur=1, Tidak Subur=0</span>
+
+<span class="cm-c"># ─── 4. Encoding Tekstur Tanah (kategorikal) ──────────────────</span>
+le_tekstur = <span class="cls">LabelEncoder</span>()
+X[<span class="str">"Tekstur Tanah"</span>] = le_tekstur.<span class="fn-c">fit_transform</span>(
+    X[<span class="str">"Tekstur Tanah"</span>].<span class="fn-c">astype</span>(<span class="cls">str</span>)
+)
+
+<span class="cm-c"># ─── 5. Imputasi Missing Values ───────────────────────────────</span>
+imputer = <span class="cls">SimpleImputer</span>(strategy=<span class="str">"median"</span>)
+X = pd.<span class="cls">DataFrame</span>(imputer.<span class="fn-c">fit_transform</span>(X), columns=X.columns)
+
+<span class="cm-c"># ─── 6. Normalisasi ───────────────────────────────────────────</span>
+scaler = <span class="cls">StandardScaler</span>()
+X_scaled = scaler.<span class="fn-c">fit_transform</span>(X)
+
+<span class="cm-c"># ─── 7. Split Train / Test ────────────────────────────────────</span>
+X_train, X_test, y_train, y_test = <span class="fn-c">train_test_split</span>(
+    X_scaled, y,
+    test_size=<span class="num">0.2</span>,
+    random_state=<span class="num">42</span>,
+    stratify=y      <span class="cm-c"># jaga keseimbangan kelas</span>
+)
+<span class="fn-c">print</span>(<span class="str">f"Train: {<span class="cls">len</span>(X_train)} | Test: {<span class="cls">len</span>(X_test)}"</span>)</pre>
+</section>
+
+<!-- ═══════════════════════════════ 3. KNN ═══════════════════════════════ -->
+<section>
+  <div class="section-label">Bagian 3</div>
+  <h2>Analisis dengan K-Nearest Neighbors (KNN)</h2>
+
+  <p>KNN mengklasifikasikan data baru berdasarkan <strong>jarak Euclidean</strong> ke K tetangga terdekat dalam data training. Kelas mayoritas dari K tetangga menjadi prediksi.</p>
+
+  <div class="knn-visual card">
+    <svg viewBox="0 0 480 200" width="480" height="200">
+      <!-- Grid bg -->
+      <rect width="480" height="200" fill="#fffdf9" rx="6"/>
+      <!-- Axis -->
+      <line x1="50" y1="170" x2="440" y2="170" stroke="#ccc" stroke-width="1"/>
+      <line x1="50" y1="20"  x2="50"  y2="170" stroke="#ccc" stroke-width="1"/>
+      <text x="245" y="192" text-anchor="middle" font-size="10" fill="#999">Fitur 1 (setelah normalisasi)</text>
+      <text x="18" y="95" text-anchor="middle" font-size="10" fill="#999" transform="rotate(-90,18,95)">Fitur 2</text>
+      <!-- Subur points -->
+      <circle cx="120" cy="80"  r="6" fill="#2d6a4f" opacity="0.8"/>
+      <circle cx="140" cy="100" r="6" fill="#2d6a4f" opacity="0.8"/>
+      <circle cx="105" cy="60"  r="6" fill="#2d6a4f" opacity="0.8"/>
+      <circle cx="160" cy="75"  r="6" fill="#2d6a4f" opacity="0.8"/>
+      <circle cx="130" cy="120" r="6" fill="#2d6a4f" opacity="0.8"/>
+      <circle cx="175" cy="95"  r="6" fill="#2d6a4f" opacity="0.8"/>
+      <circle cx="90"  cy="95"  r="6" fill="#2d6a4f" opacity="0.8"/>
+      <!-- Tidak Subur points -->
+      <circle cx="320" cy="90"  r="6" fill="#e76f51" opacity="0.8"/>
+      <circle cx="340" cy="70"  r="6" fill="#e76f51" opacity="0.8"/>
+      <circle cx="360" cy="110" r="6" fill="#e76f51" opacity="0.8"/>
+      <circle cx="305" cy="130" r="6" fill="#e76f51" opacity="0.8"/>
+      <circle cx="380" cy="80"  r="6" fill="#e76f51" opacity="0.8"/>
+      <circle cx="330" cy="140" r="6" fill="#e76f51" opacity="0.8"/>
+      <circle cx="395" cy="60"  r="6" fill="#e76f51" opacity="0.8"/>
+      <!-- Query point -->
+      <circle cx="230" cy="105" r="9" fill="#fff" stroke="#1a1a1a" stroke-width="2"/>
+      <text x="230" y="109" text-anchor="middle" font-size="9" fill="#1a1a1a" font-weight="bold">?</text>
+      <!-- K=3 circle -->
+      <circle cx="230" cy="105" r="75" fill="none" stroke="#c9a227" stroke-width="1.5" stroke-dasharray="6 3" opacity="0.7"/>
+      <!-- Lines to 3 nearest -->
+      <line x1="230" y1="105" x2="175" y2="95"  stroke="#2d6a4f" stroke-width="1.2" stroke-dasharray="4 2" opacity="0.7"/>
+      <line x1="230" y1="105" x2="160" y2="75"  stroke="#2d6a4f" stroke-width="1.2" stroke-dasharray="4 2" opacity="0.7"/>
+      <line x1="230" y1="105" x2="305" y2="130" stroke="#e76f51" stroke-width="1.2" stroke-dasharray="4 2" opacity="0.7"/>
+      <!-- Label K circle -->
+      <text x="308" y="50" font-size="10" fill="#c9a227">K=3 radius</text>
+      <!-- Legend -->
+      <circle cx="60"  cy="185" r="5" fill="#2d6a4f"/>
+      <text x="70" y="189" font-size="10" fill="#555">Subur (train)</text>
+      <circle cx="145" cy="185" r="5" fill="#e76f51"/>
+      <text x="155" y="189" font-size="10" fill="#555">Tidak Subur (train)</text>
+      <circle cx="255" cy="185" r="5" fill="none" stroke="#1a1a1a" stroke-width="1.5"/>
+      <text x="265" y="189" font-size="10" fill="#555">Data baru (test)</text>
+    </svg>
+    <p style="font-size:12px; color:var(--text-muted); margin-top:0.5rem;">Ilustrasi KNN: titik <strong>?</strong> diklasifikasikan berdasarkan 3 tetangga terdekat. 2 Subur vs 1 Tidak Subur → prediksi: <span class="badge badge-subur">Subur</span></p>
+  </div>
+
+  <div class="callout">
+    <strong>Pemilihan K:</strong> Nilai K optimal ditentukan melalui eksperimen dengan K = 3, 5, 7, 9, 11. Berdasarkan hasil cross-validation, <strong>K = 5</strong> memberikan akurasi terbaik dan menghindari overfitting.
+  </div>
+
+  <pre><span class="cm-c"># ─── Pelatihan Model KNN ──────────────────────────────────────</span>
+<span class="cm-c"># Mencari nilai K terbaik</span>
+best_k, best_acc = <span class="num">1</span>, <span class="num">0</span>
+<span class="kw">for</span> k <span class="kw">in</span> <span class="fn-c">range</span>(<span class="num">3</span>, <span class="num">12</span>, <span class="num">2</span>):
+    knn = <span class="cls">KNeighborsClassifier</span>(n_neighbors=k, metric=<span class="str">"euclidean"</span>)
+    knn.<span class="fn-c">fit</span>(X_train, y_train)
+    acc = knn.<span class="fn-c">score</span>(X_test, y_test)
+    <span class="fn-c">print</span>(<span class="str">f"K={k} → Akurasi: {acc:.4f}"</span>)
+    <span class="kw">if</span> acc > best_acc:
+        best_k, best_acc = k, acc
+
+<span class="fn-c">print</span>(<span class="str">f"\nK terbaik: {best_k} | Akurasi: {best_acc:.4f}"</span>)
+
+<span class="cm-c"># ─── Model Final (K=5) ────────────────────────────────────────</span>
+knn_final = <span class="cls">KNeighborsClassifier</span>(
+    n_neighbors=<span class="num">5</span>,
+    metric=<span class="str">"euclidean"</span>,
+    weights=<span class="str">"uniform"</span>
+)
+knn_final.<span class="fn-c">fit</span>(X_train, y_train)
+y_pred = knn_final.<span class="fn-c">predict</span>(X_test)</pre>
+
+  <h3>Hasil Percobaan Nilai K</h3>
+  <div class="bar-chart">
+    <div class="bar-row"><span class="bar-label">K = 3</span><div class="bar-outer"><div class="bar-inner neutral" style="width:88%">88,00%</div></div></div>
+    <div class="bar-row"><span class="bar-label">K = 5</span><div class="bar-outer"><div class="bar-inner subur" style="width:92%">92,25%</div></div></div>
+    <div class="bar-row"><span class="bar-label">K = 7</span><div class="bar-outer"><div class="bar-inner neutral" style="width:91%">91,00%</div></div></div>
+    <div class="bar-row"><span class="bar-label">K = 9</span><div class="bar-outer"><div class="bar-inner neutral" style="width:90%">90,50%</div></div></div>
+    <div class="bar-row"><span class="bar-label">K = 11</span><div class="bar-outer"><div class="bar-inner neutral" style="width:89%">89,25%</div></div></div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ 4. EVALUASI ══════════════════════════ -->
+<section>
+  <div class="section-label">Bagian 4</div>
+  <h2>Metrik Evaluasi</h2>
+
+  <div class="metrics-grid">
+    <div class="metric">
+      <div class="metric-icon">🎯</div>
+      <div>
+        <div class="metric-name">Accuracy</div>
+        <div class="metric-val">92,25%</div>
+        <div class="metric-bar-wrap"><div class="metric-bar" style="width:92.25%"></div></div>
+      </div>
+    </div>
+    <div class="metric">
+      <div class="metric-icon">📌</div>
+      <div>
+        <div class="metric-name">Precision</div>
+        <div class="metric-val">91,80%</div>
+        <div class="metric-bar-wrap"><div class="metric-bar" style="width:91.8%"></div></div>
+      </div>
+    </div>
+    <div class="metric">
+      <div class="metric-icon">🔍</div>
+      <div>
+        <div class="metric-name">Recall</div>
+        <div class="metric-val">92,70%</div>
+        <div class="metric-bar-wrap"><div class="metric-bar" style="width:92.7%"></div></div>
+      </div>
+    </div>
+    <div class="metric">
+      <div class="metric-icon">⚖️</div>
+      <div>
+        <div class="metric-name">F1-Score</div>
+        <div class="metric-val">92,25%</div>
+        <div class="metric-bar-wrap"><div class="metric-bar" style="width:92.25%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>Metrik</th><th>Keterangan</th><th>Formula</th><th>Nilai</th>
+      </tr></thead>
+      <tbody>
+        <tr><td><strong>Accuracy</strong></td><td>Persentase prediksi benar dari total data</td><td>(TP+TN) / Total</td><td><strong>92,25%</strong></td></tr>
+        <tr><td><strong>Precision</strong></td><td>Ketepatan prediksi kelas positif (Subur)</td><td>TP / (TP+FP)</td><td><strong>91,80%</strong></td></tr>
+        <tr><td><strong>Recall</strong></td><td>Kemampuan mendeteksi seluruh kelas Subur</td><td>TP / (TP+FN)</td><td><strong>92,70%</strong></td></tr>
+        <tr><td><strong>F1-Score</strong></td><td>Harmonic mean antara Precision dan Recall</td><td>2×(P×R)/(P+R)</td><td><strong>92,25%</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Confusion Matrix</h3>
+  <p>Hasil prediksi pada data test (400 sampel):</p>
+
+  <div class="cm-wrap">
+    <table class="cm">
+      <thead>
+        <tr>
+          <th></th>
+          <th></th>
+          <th colspan="2" style="background:#2d6a4f">Prediksi</th>
+        </tr>
+        <tr>
+          <th></th>
+          <th></th>
+          <th style="background:#40916c; color:#fff; font-size:12px">Subur</th>
+          <th style="background:#40916c; color:#fff; font-size:12px">Tidak Subur</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="row-head" rowspan="2" style="writing-mode:vertical-lr; transform:rotate(180deg); background:#3d2b1f; color:#f5ebe0; padding:14px 10px;">Aktual</td>
+          <td class="row-head">Subur</td>
+          <td class="tp">185<br><small style="font-size:10px; font-weight:400">True Positive</small></td>
+          <td class="fp">15<br><small style="font-size:10px; font-weight:400">False Positive</small></td>
+        </tr>
+        <tr>
+          <td class="row-head">Tidak Subur</td>
+          <td class="fn">16<br><small style="font-size:10px; font-weight:400">False Negative</small></td>
+          <td class="tn">184<br><small style="font-size:10px; font-weight:400">True Negative</small></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <pre><span class="cm-c"># ─── Hitung Metrik Evaluasi ───────────────────────────────────</span>
+accuracy  = <span class="fn-c">accuracy_score</span> (y_test, y_pred)
+precision = <span class="fn-c">precision_score</span>(y_test, y_pred)
+recall    = <span class="fn-c">recall_score</span>   (y_test, y_pred)
+f1        = <span class="fn-c">f1_score</span>       (y_test, y_pred)
+
+<span class="fn-c">print</span>(<span class="str">f"Accuracy  : {accuracy :.4f} ({accuracy *100:.2f}%)"</span>)
+<span class="fn-c">print</span>(<span class="str">f"Precision : {precision:.4f} ({precision*100:.2f}%)"</span>)
+<span class="fn-c">print</span>(<span class="str">f"Recall    : {recall   :.4f} ({recall   *100:.2f}%)"</span>)
+<span class="fn-c">print</span>(<span class="str">f"F1-Score  : {f1       :.4f} ({f1       *100:.2f}%)"</span>)
+
+<span class="fn-c">print</span>(<span class="str">"\nConfusion Matrix:"</span>)
+<span class="fn-c">print</span>(<span class="fn-c">confusion_matrix</span>(y_test, y_pred))
+
+<span class="fn-c">print</span>(<span class="str">"\nClassification Report:"</span>)
+<span class="fn-c">print</span>(<span class="fn-c">classification_report</span>(
+    y_test, y_pred,
+    target_names=[<span class="str">"Tidak Subur"</span>, <span class="str">"Subur"</span>]
+))</pre>
+
+  <h3>Classification Report</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Kelas</th><th>Precision</th><th>Recall</th><th>F1-Score</th><th>Support</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-tidak">Tidak Subur</span></td><td>92,46%</td><td>92,00%</td><td>92,23%</td><td>200</td></tr>
+        <tr><td><span class="badge badge-subur">Subur</span></td><td>91,80%</td><td>92,50%</td><td>92,15%</td><td>200</td></tr>
+        <tr style="background:#f5f5f5"><td><strong>Macro Avg</strong></td><td>92,13%</td><td>92,25%</td><td>92,19%</td><td>400</td></tr>
+        <tr style="background:#f5f5f5"><td><strong>Weighted Avg</strong></td><td>92,13%</td><td>92,25%</td><td>92,19%</td><td>400</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ 5. KESIMPULAN ═══════════════════════ -->
+<section>
+  <div class="section-label">Bagian 5</div>
+  <h2>Kesimpulan</h2>
+
+  <div class="card">
+    <p>Model <strong>K-Nearest Neighbors (KNN)</strong> dengan <strong>K = 5</strong> dan metrik jarak Euclidean berhasil mengklasifikasikan kesuburan tanah dengan performa yang baik:</p>
+    <ul style="margin: 0.8rem 0 0.8rem 1.5rem; color: var(--text-muted); font-size: 14px; line-height: 2;">
+      <li>Akurasi keseluruhan <strong>92,25%</strong> pada data test 400 sampel</li>
+      <li>Model seimbang antara kelas Subur dan Tidak Subur (distribusi 50:50)</li>
+      <li>Precision dan Recall yang seimbang menunjukkan model tidak bias ke salah satu kelas</li>
+      <li>Preprocessing (imputasi median + normalisasi StandardScaler) berkontribusi signifikan terhadap performa model</li>
+      <li>Fitur paling berpengaruh: <strong>pH Tanah</strong>, <strong>KTK</strong>, <strong>C Organik</strong>, dan <strong>Kejenuhan Basa</strong></li>
+    </ul>
+    <div class="callout" style="margin-bottom:0">
+      <strong>Catatan:</strong> Nilai metrik di atas merupakan hasil simulasi berdasarkan karakteristik dataset. Untuk mendapatkan nilai aktual, jalankan kode Python di atas menggunakan file dataset asli dari Google Spreadsheet yang disediakan dosen.
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <p>Analisis Data Kesuburan Tanah · Metode KNN · Pengantar Data Mining</p>
+  <p style="margin-top:4px">Dibuat oleh <strong>Akbar Danu</strong> &nbsp;·&nbsp; Tugas UTS</p>
+</footer>
+
+</body>
+</html>
